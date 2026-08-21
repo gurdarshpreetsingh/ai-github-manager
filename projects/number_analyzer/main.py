@@ -1,20 +1,23 @@
 import sys
 
+# Check if there are enough arguments
 if len(sys.argv) < 2:
-    print("Please provide at least one number.")
+    print("Usage: python number_analyzer.py [numbers]")
     sys.exit(1)
 
-numbers = []
-for arg in sys.argv[1:]:
-    if not arg.isdigit():
-        print("All arguments must be numbers.")
-        sys.exit(1)
-    numbers.append(float(arg))
+# Convert arguments to integers
+numbers = [int(arg) for arg in sys.argv[1:]]
 
+# Calculate minimum
 min_num = min(numbers)
-max_num = max(numbers)
-average = sum(numbers) / len(numbers)
 
+# Calculate maximum
+max_num = max(numbers)
+
+# Calculate average
+avg_num = sum(numbers) / len(numbers)
+
+# Print the results
 print(f"Minimum: {min_num}")
 print(f"Maximum: {max_num}")
-print(f"Average: {average}")
+print(f"Average: {avg_num}")

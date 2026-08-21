@@ -1,25 +1,39 @@
 from pathlib import Path
+import os
 import subprocess
-import ollama
+from datetime import datetime
 
+import ollama
+from dotenv import load_dotenv
+from github import Github, Auth
+
+
+# --------------------------------------------------
+# Configuration
+# --------------------------------------------------
 
 MODEL = "qwen2.5-coder:1.5b"
+REPOSITORY = "gurdarshpreetsingh/ai-github-manager"
 
 
-def run_command(command):
-    """Run a command and return its result."""
+# --------------------------------------------------
+# Environment
+# --------------------------------------------------
 
-    result = subprocess.run(
-        command,
-        capture_output=True,
-        text=True
-    )
+load_dotenv()
 
-    return result.returncode, result.stdout, result.stderr
+github_token = os.getenv("GITHUB_TOKEN")
 
+if not github_token:
+    raise RuntimeError("GITHUB_TOKEN is missing from .env")
+
+
+# --------------------------------------------------
+# AI
+# --------------------------------------------------
 
 def ask_ai(prompt):
-    """Ask the local Ollama model to generate code."""
+    """Send a prompt to the local Ollama model."""
 
     response = ollama.chat(
         model=MODEL,
@@ -51,8 +65,11 @@ def clean_code(code):
     return code.strip()
 
 
+# --------------------------------------------------
+# Project generation
+# --------------------------------------------------
+
 def generate_project():
-    """Generate the Python project using AI."""
 
     prompt = """
 Create a simple Python project called number_analyzer.
@@ -60,9 +77,9 @@ Create a simple Python project called number_analyzer.
 Requirements:
 
 1. Read numbers from command-line arguments.
-2. Calculate the minimum.
-3. Calculate the maximum.
-4. Calculate the average.
+2. Calculate minimum.
+3. Calculate maximum.
+4. Calculate average.
 5. Print the results clearly.
 
 Return ONLY valid Python code.
@@ -90,8 +107,11 @@ Do not use Markdown code fences.
     return project_file
 
 
+# --------------------------------------------------
+# Testing
+# --------------------------------------------------
+
 def test_project(project_file):
-    """Run the generated project."""
 
     print("🧪 Testing generated project...")
 
@@ -104,58 +124,157 @@ def test_project(project_file):
         "40"
     ]
 
-    returncode, stdout, stderr = run_command(command)
+    result = subprocess.run(
+        command,
+        capture_output=True,
+        text=True
+    )
 
-    if returncode == 0:
+    if result.returncode == 0:
 
         print("✅ Test passed!")
-        print(stdout)
+        print(result.stdout)
 
         return True
 
     print("❌ Test failed!")
-    print(stderr)
+    print(result.stderr)
 
     return False
 
 
-def git_push():
-    """Commit and push the generated project."""
+# --------------------------------------------------
+# Git helpers
+# --------------------------------------------------
 
-    print("📦 Adding files to Git...")
+def run_git(command):
 
-    commands = [
-        ["git", "add", "."],
+    result = subprocess.run(
+        command,
+        capture_output=True,
+        text=True
+    )
+
+    if result.returncode != 0:
+
+        print("❌ Git command failed:")
+        print(result.stderr)
+
+        raise RuntimeError(
+            f"Git command failed: {' '.join(command)}"
+        )
+
+    if result.stdout:
+        print(result.stdout)
+
+    return result.stdout
+
+
+def create_branch():
+
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+
+    branch_name = f"ai/project-{timestamp}"
+
+    print(f"🌿 Creating branch: {branch_name}")
+
+    run_git(["git", "checkout", "-b", branch_name])
+
+    return branch_name
+
+
+# --------------------------------------------------
+# Commit and push
+# --------------------------------------------------
+
+def commit_and_push(branch_name):
+
+    print("📦 Adding changes...")
+
+    run_git(["git", "add", "."])
+
+    commit_message = (
+        "AI: generate number analyzer project"
+    )
+
+    print("💾 Creating commit...")
+
+    run_git(
         [
             "git",
             "commit",
             "-m",
-            "AI: generate number analyzer project"
-        ],
-        ["git", "push"]
-    ]
+            commit_message
+        ]
+    )
 
-    for command in commands:
+    print("⬆️ Pushing branch...")
 
-        print("Running:", " ".join(command))
+    run_git(
+        [
+            "git",
+            "push",
+            "-u",
+            "origin",
+            branch_name
+        ]
+    )
 
-        returncode, stdout, stderr = run_command(command)
 
-        if returncode != 0:
+# --------------------------------------------------
+# Pull Request
+# --------------------------------------------------
 
-            print("❌ Git command failed:")
-            print(stderr)
+def create_pull_request(branch_name):
 
-            return False
+    print("🔀 Creating Pull Request...")
 
-        print(stdout)
+    github = Github(
+        auth=Auth.Token(github_token)
+    )
 
-    print("🚀 Successfully pushed to GitHub!")
+    repository = github.get_repo(REPOSITORY)
 
-    return True
+    pull_request = repository.create_pull(
+        title="AI: Generate Number Analyzer",
+        body="""
+## AI Generated Change
 
+This Pull Request was created automatically by the AI GitHub Manager.
+
+### Changes
+
+- Generated a Python number analyzer
+- Tested generated code
+- Created a dedicated AI branch
+- Automated Git commit
+- Automated GitHub push
+
+### Validation
+
+The generated project passed the automated test.
+
+Please review the code before merging.
+""",
+        head=branch_name,
+        base="main"
+    )
+
+    print("✅ Pull Request created!")
+
+    print("🔗 Pull Request:")
+    print(pull_request.html_url)
+
+
+# --------------------------------------------------
+# Main
+# --------------------------------------------------
 
 def main():
+
+    print("=" * 60)
+    print("       AI GITHUB DEVELOPMENT AGENT")
+    print("=" * 60)
 
     project_file = generate_project()
 
@@ -163,12 +282,24 @@ def main():
 
     if not test_passed:
 
+        print()
         print("⚠️ Generated code failed testing.")
-        print("🚫 Nothing will be pushed to GitHub.")
+        print("🚫 Pull Request will NOT be created.")
 
         return
 
-    git_push()
+    print()
+
+    branch_name = create_branch()
+
+    commit_and_push(branch_name)
+
+    create_pull_request(branch_name)
+
+    print()
+    print("🎉 AI DEVELOPMENT TASK COMPLETED")
+    print("👤 Waiting for human review.")
+    print()
 
 
 if __name__ == "__main__":
