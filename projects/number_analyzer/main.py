@@ -1,20 +1,26 @@
 import sys
 
-if len(sys.argv) < 2:
-    print("Please provide at least one number.")
-    sys.exit(1)
+def main():
+    # Read numbers from command-line arguments
+    numbers = [float(arg) for arg in sys.argv[1:] if arg.isdigit()]
+    
+    if not numbers:
+        print("No valid numbers provided.")
+        return
+    
+    # Calculate minimum
+    min_num = min(numbers)
+    
+    # Calculate maximum
+    max_num = max(numbers)
+    
+    # Calculate average
+    avg_num = sum(numbers) / len(numbers)
+    
+    # Print results clearly
+    print(f"Minimum: {min_num}")
+    print(f"Maximum: {max_num}")
+    print(f"Average: {avg_num}")
 
-numbers = []
-for arg in sys.argv[1:]:
-    if not arg.isdigit():
-        print("All arguments must be numbers.")
-        sys.exit(1)
-    numbers.append(float(arg))
-
-min_num = min(numbers)
-max_num = max(numbers)
-average = sum(numbers) / len(numbers)
-
-print(f"Minimum: {min_num}")
-print(f"Maximum: {max_num}")
-print(f"Average: {average}")
+if __name__ == "__main__":
+    main()
