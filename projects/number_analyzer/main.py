@@ -1,20 +1,27 @@
 import sys
 
-if len(sys.argv) < 2:
-    print("Please provide at least one number.")
-    sys.exit(1)
+def main():
+    # Check if there are enough command-line arguments
+    if len(sys.argv) < 2:
+        print("Usage: python number_analyzer.py <number>")
+        return
 
-numbers = []
-for arg in sys.argv[1:]:
-    if not arg.isdigit():
-        print("All arguments must be numbers.")
-        sys.exit(1)
-    numbers.append(float(arg))
+    # Read numbers from command-line arguments
+    numbers = [float(arg) for arg in sys.argv[1:]]
 
-min_num = min(numbers)
-max_num = max(numbers)
-average = sum(numbers) / len(numbers)
+    # Calculate minimum
+    min_number = min(numbers)
 
-print(f"Minimum: {min_num}")
-print(f"Maximum: {max_num}")
-print(f"Average: {average}")
+    # Calculate maximum
+    max_number = max(numbers)
+
+    # Calculate average
+    average = sum(numbers) / len(numbers)
+
+    # Print the results
+    print(f"Minimum: {min_number}")
+    print(f"Maximum: {max_number}")
+    print(f"Average: {average}")
+
+if __name__ == "__main__":
+    main()

@@ -1,25 +1,40 @@
 from pathlib import Path
+import os
 import subprocess
-import ollama
+from datetime import datetime
 
+import ollama
+from dotenv import load_dotenv
+from github import Github, Auth
+
+
+# ============================================================
+# CONFIGURATION
+# ============================================================
 
 MODEL = "qwen2.5-coder:1.5b"
+REPOSITORY = "gurdarshpreetsingh/ai-github-manager"
+MAX_ATTEMPTS = 3
 
 
-def run_command(command):
-    """Run a command and return its result."""
+# ============================================================
+# ENVIRONMENT
+# ============================================================
 
-    result = subprocess.run(
-        command,
-        capture_output=True,
-        text=True
-    )
+load_dotenv()
 
-    return result.returncode, result.stdout, result.stderr
+github_token = os.getenv("GITHUB_TOKEN")
 
+if not github_token:
+    raise RuntimeError("GITHUB_TOKEN is missing from .env")
+
+
+# ============================================================
+# AI
+# ============================================================
 
 def ask_ai(prompt):
-    """Ask the local Ollama model to generate code."""
+    """Ask the local Ollama model for a response."""
 
     response = ollama.chat(
         model=MODEL,
@@ -35,24 +50,29 @@ def ask_ai(prompt):
 
 
 def clean_code(code):
-    """Remove Markdown code fences from AI output."""
+    """Safely extract Python code from AI output."""
 
     code = code.strip()
 
-    if code.startswith("```python"):
-        code = code[len("```python"):]
+    if "```" in code:
 
-    elif code.startswith("```"):
-        code = code[len("```"):]
+        parts = code.split("```")
 
-    if code.endswith("```"):
-        code = code[:-3]
+        if len(parts) >= 3:
+
+            code = parts[1]
+
+            if code.lstrip().startswith("python"):
+                code = code.lstrip()[6:]
 
     return code.strip()
 
 
+# ============================================================
+# PROJECT GENERATION
+# ============================================================
+
 def generate_project():
-    """Generate the Python project using AI."""
 
     prompt = """
 Create a simple Python project called number_analyzer.
@@ -60,9 +80,9 @@ Create a simple Python project called number_analyzer.
 Requirements:
 
 1. Read numbers from command-line arguments.
-2. Calculate the minimum.
-3. Calculate the maximum.
-4. Calculate the average.
+2. Calculate minimum.
+3. Calculate maximum.
+4. Calculate average.
 5. Print the results clearly.
 
 Return ONLY valid Python code.
@@ -90,8 +110,11 @@ Do not use Markdown code fences.
     return project_file
 
 
+# ============================================================
+# TESTING
+# ============================================================
+
 def test_project(project_file):
-    """Run the generated project."""
 
     print("🧪 Testing generated project...")
 
@@ -104,72 +127,278 @@ def test_project(project_file):
         "40"
     ]
 
-    returncode, stdout, stderr = run_command(command)
+    result = subprocess.run(
+        command,
+        capture_output=True,
+        text=True
+    )
 
-    if returncode == 0:
+    if result.returncode == 0:
 
         print("✅ Test passed!")
-        print(stdout)
+        print(result.stdout)
 
-        return True
+        return True, result.stdout
 
     print("❌ Test failed!")
-    print(stderr)
+    print(result.stderr)
 
-    return False
+    return False, result.stderr
 
 
-def git_push():
-    """Commit and push the generated project."""
+# ============================================================
+# AI SELF-CORRECTION
+# ============================================================
 
-    print("📦 Adding files to Git...")
+def fix_project(project_file, error):
 
-    commands = [
-        ["git", "add", "."],
+    print("🔧 Asking AI to fix the generated code...")
+
+    current_code = project_file.read_text(
+        encoding="utf-8"
+    )
+
+    prompt = f"""
+You are debugging a Python project.
+
+Current project code:
+
+{current_code}
+
+The program produced this error:
+
+{error}
+
+Fix the Python code so that it works correctly.
+
+Requirements:
+
+1. Return ONLY the complete corrected Python code.
+2. Do not use Markdown code fences.
+3. Do not explain anything.
+4. Preserve the original functionality.
+5. Make sure the result is valid Python syntax.
+"""
+
+    fixed_code = ask_ai(prompt)
+
+    fixed_code = clean_code(fixed_code)
+
+    project_file.write_text(
+        fixed_code,
+        encoding="utf-8"
+    )
+
+    print("✅ AI generated a corrected version.")
+
+
+# ============================================================
+# GIT
+# ============================================================
+
+def run_git(command):
+
+    result = subprocess.run(
+        command,
+        capture_output=True,
+        text=True
+    )
+
+    if result.returncode != 0:
+
+        print("❌ Git command failed:")
+        print(result.stderr)
+
+        raise RuntimeError(
+            f"Git command failed: {' '.join(command)}"
+        )
+
+    if result.stdout:
+        print(result.stdout)
+
+    return result.stdout
+
+
+def create_branch():
+
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+
+    branch_name = f"ai/project-{timestamp}"
+
+    print(f"🌿 Creating branch: {branch_name}")
+
+    run_git(
+        [
+            "git",
+            "checkout",
+            "-b",
+            branch_name
+        ]
+    )
+
+    return branch_name
+
+
+def commit_and_push(branch_name):
+
+    print("📦 Adding changes...")
+
+    run_git(
+        [
+            "git",
+            "add",
+            "."
+        ]
+    )
+
+    print("💾 Creating commit...")
+
+    run_git(
         [
             "git",
             "commit",
             "-m",
             "AI: generate number analyzer project"
-        ],
-        ["git", "push"]
-    ]
+        ]
+    )
 
-    for command in commands:
+    print("⬆️ Pushing branch...")
 
-        print("Running:", " ".join(command))
+    run_git(
+        [
+            "git",
+            "push",
+            "-u",
+            "origin",
+            branch_name
+        ]
+    )
 
-        returncode, stdout, stderr = run_command(command)
 
-        if returncode != 0:
+# ============================================================
+# PULL REQUEST
+# ============================================================
 
-            print("❌ Git command failed:")
-            print(stderr)
+def create_pull_request(branch_name):
 
-            return False
+    print("🔀 Creating Pull Request...")
 
-        print(stdout)
+    github = Github(
+        auth=Auth.Token(github_token)
+    )
 
-    print("🚀 Successfully pushed to GitHub!")
+    repository = github.get_repo(
+        REPOSITORY
+    )
 
-    return True
+    pull_request = repository.create_pull(
+        title="AI: Generate Number Analyzer",
 
+        body="""
+## AI Generated Change
+
+This Pull Request was created automatically
+by the AI GitHub Development Agent.
+
+### Changes
+
+- Generated Python project
+- Tested generated code
+- AI self-correction enabled
+- Created dedicated AI branch
+- Automated Git commit
+- Automated GitHub push
+
+### Validation
+
+The generated project passed automated testing.
+
+Please review the generated code before merging.
+""",
+
+        head=branch_name,
+        base="main"
+    )
+
+    print("✅ Pull Request created!")
+
+    print("🔗 Pull Request:")
+    print(pull_request.html_url)
+
+
+# ============================================================
+# MAIN AGENT
+# ============================================================
 
 def main():
 
+    print("=" * 60)
+    print("       AI GITHUB DEVELOPMENT AGENT")
+    print("=" * 60)
+
     project_file = generate_project()
 
-    test_passed = test_project(project_file)
+    for attempt in range(1, MAX_ATTEMPTS + 1):
 
-    if not test_passed:
+        print()
+        print(
+            f"🔄 Test attempt "
+            f"{attempt}/{MAX_ATTEMPTS}"
+        )
 
-        print("⚠️ Generated code failed testing.")
-        print("🚫 Nothing will be pushed to GitHub.")
+        test_passed, output = test_project(
+            project_file
+        )
 
-        return
+        if test_passed:
 
-    git_push()
+            print()
+            print("🎉 Code passed testing!")
 
+            branch_name = create_branch()
+
+            commit_and_push(
+                branch_name
+            )
+
+            create_pull_request(
+                branch_name
+            )
+
+            print()
+            print("🎉 AI DEVELOPMENT TASK COMPLETED")
+            print("👤 Waiting for human review.")
+
+            return
+
+        if attempt < MAX_ATTEMPTS:
+
+            print()
+            print(
+                "🤖 AI will attempt "
+                "to fix the error..."
+            )
+
+            fix_project(
+                project_file,
+                output
+            )
+
+        else:
+
+            print()
+            print(
+                "❌ Maximum retry limit reached."
+            )
+
+            print(
+                "🚫 Pull Request will NOT be created."
+            )
+
+
+# ============================================================
+# ENTRY POINT
+# ============================================================
 
 if __name__ == "__main__":
     main()
