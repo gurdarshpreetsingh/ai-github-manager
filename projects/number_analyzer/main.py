@@ -19,4 +19,7 @@ print(f"Minimum: {min_num}")
 print(f"Maximum: {max_num}")
 print(f"Average: {average}")
 
-print(unknown_variable)
+try:
+    print(unknown_variable)
+except NameError:
+    print("unknown_variable is not defined.")
