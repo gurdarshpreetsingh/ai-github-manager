@@ -330,6 +330,53 @@ Requirements:
     )
 
     print("AI generated a CI-based correction.")
+
+def apply_ci_fix_to_branch(branch_name, project_file):
+    """Commit and push an AI-generated CI fix to the PR branch."""
+
+    print(f"Switching to PR branch: {branch_name}")
+
+    run_git(
+        [
+            "git",
+            "checkout",
+            branch_name
+        ]
+    )
+
+    print("Adding AI fix...")
+
+    run_git(
+        [
+            "git",
+            "add",
+            str(project_file)
+        ]
+    )
+
+    print("Creating CI fix commit...")
+
+    run_git(
+        [
+            "git",
+            "commit",
+            "-m",
+            "AI: fix GitHub Actions failure"
+        ]
+    )
+
+    print("Pushing CI fix...")
+
+    run_git(
+        [
+            "git",
+            "push",
+            "origin",
+            branch_name
+        ]
+    )
+
+    print("AI CI fix pushed successfully!")
 # ============================================================
 # GIT
 # ============================================================
