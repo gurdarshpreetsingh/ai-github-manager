@@ -18,3 +18,8 @@ average = sum(numbers) / len(numbers)
 print(f"Minimum: {min_num}")
 print(f"Maximum: {max_num}")
 print(f"Average: {average}")
+
+try:
+    print(unknown_variable)
+except NameError:
+    print("unknown_variable is not defined.")
