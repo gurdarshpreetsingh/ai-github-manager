@@ -1,20 +1,26 @@
 import sys
+from typing import List
 
-if len(sys.argv) < 2:
-    print("Please provide at least one number.")
-    sys.exit(1)
+def analyze_numbers(numbers: List[float]) -> None:
+    if not numbers:
+        print("No numbers provided.")
+        return
 
-numbers = []
-for arg in sys.argv[1:]:
-    if not arg.isdigit():
-        print("All arguments must be numbers.")
-        sys.exit(1)
-    numbers.append(float(arg))
+    min_num = min(numbers)
+    max_num = max(numbers)
+    avg_num = sum(numbers) / len(numbers)
 
-min_num = min(numbers)
-max_num = max(numbers)
-average = sum(numbers) / len(numbers)
+    print(f"Minimum number: {min_num}")
+    print(f"Maximum number: {max_num}")
+    print(f"Average number: {avg_num}")
 
-print(f"Minimum: {min_num}")
-print(f"Maximum: {max_num}")
-print(f"Average: {average}")
+def main() -> None:
+    if len(sys.argv) < 2:
+        print("Usage: python number_analyzer.py <number1> <number2> ...")
+        return
+
+    numbers = [float(num) for num in sys.argv[1:]]
+    analyze_numbers(numbers)
+
+if __name__ == "__main__":
+    main()
